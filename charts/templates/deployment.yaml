@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "webhook-server.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "webhook-server.fullname" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "webhook-server.fullname" . }}
+    spec:
+      # REQUIRED: allow nonroot user to read Secret-mounted certs
+      securityContext:
+        fsGroup: 65532
+
+      containers:
+        - name: webhook
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+
+          ports:
+            - containerPort: {{ .Values.service.targetPort }}
+
+          volumeMounts:
+            - name: tls
+              mountPath: /certs
+              readOnly: true
+
+          # IMPORTANT: ensure webhook is ready before API server calls it
+          readinessProbe:
+            httpGet:
+              scheme: HTTPS
+              path: {{ .Values.readinessProbe | default "/healthz" }}
+              port: {{ .Values.service.targetPort }}
+            initialDelaySeconds: 5
+            periodSeconds: 5
+
+          {{- with .Values.resources }}
+          resources:
+{{ toYaml . | indent 12 }}
+          {{- end }}
+
+      volumes:
+        - name: tls
+          secret:
+            secretName: {{ .Values.certManager.secretName }}

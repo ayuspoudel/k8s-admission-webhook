@@ -1,0 +1,35 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: {{ include "webhook-server.fullname" . }}
+  annotations:
+    cert-manager.io/inject-ca-from: "{{ .Release.Namespace }}/{{ .Values.certManager.certificateName }}"
+
+webhooks:
+- name: {{ include "webhook-server.fullname" . }}.{{ .Release.Namespace }}.svc
+
+  admissionReviewVersions: ["v1"]
+  sideEffects: None
+
+  failurePolicy: {{ .Values.webhook.failurePolicy }}
+  timeoutSeconds: {{ .Values.webhook.timeoutSeconds }}
+
+  namespaceSelector:
+    matchExpressions:
+    - key: kubernetes.io/metadata.name
+      operator: NotIn
+      values:
+{{ toYaml .Values.excludeNamespaces | indent 8 }}
+
+  clientConfig:
+    service:
+      name: {{ include "webhook-server.fullname" . }}
+      namespace: {{ .Release.Namespace }}
+      path: {{ .Values.webhook.path }}
+      port: {{ .Values.service.port }}
+
+  rules:
+  - operations: ["CREATE"]
+    apiGroups: [""]
+    apiVersions: ["v1"]
+    resources: ["pods"]

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: webhook-server
+description: Kubernetes Validating Admission Webhook
+type: application
+version: 1.0.0
+appVersion: "1.0.0"

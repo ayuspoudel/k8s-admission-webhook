@@ -1,0 +1,126 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+
+  "properties": {
+    "createNamespace": {
+      "type": "boolean",
+      "description": "Whether to create the release namespace"
+    },
+
+    "replicaCount": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Number of webhook replicas"
+    },
+    "readinessProbe": {
+        "type" : "string",
+        "minimum" :1,
+        "description" : "Readiness endpoint like '/healthz'"
+    },
+
+    "image": {
+      "type": "object",
+      "required": ["repository", "tag", "pullPolicy"],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "description": "Docker image repository"
+        },
+        "tag": {
+          "type": "string",
+          "description": "Docker image tag"
+        },
+        "pullPolicy": {
+          "type": "string",
+          "enum": ["Always", "IfNotPresent", "Never"],
+          "description": "Image pull policy"
+        }
+      }
+    },
+
+    "service": {
+      "type": "object",
+      "required": ["port", "targetPort"],
+      "properties": {
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "description": "Service port exposed to the API server"
+        },
+        "targetPort": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "description": "Container port the webhook listens on"
+        }
+      }
+    },
+
+    "webhook": {
+      "type": "object",
+      "required": ["path", "timeoutSeconds", "failurePolicy"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Webhook HTTP path"
+        },
+        "timeoutSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30,
+          "description": "Timeout for webhook calls"
+        },
+        "failurePolicy": {
+          "type": "string",
+          "enum": ["Fail", "Ignore"],
+          "description": "Admission failure behavior"
+        }
+      }
+    },
+
+    "excludeNamespaces": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Namespaces excluded from webhook interception"
+    },
+
+    "resources": {
+      "type": "object",
+      "description": "Container resource requests and limits",
+      "additionalProperties": true
+    },
+
+    "certManager": {
+      "type": "object",
+      "required": ["issuerName", "certificateName", "secretName"],
+      "properties": {
+        "issuerName": {
+          "type": "string",
+          "description": "cert-manager Issuer name"
+        },
+        "certificateName": {
+          "type": "string",
+          "description": "cert-manager Certificate name"
+        },
+        "secretName": {
+          "type": "string",
+          "description": "Secret containing TLS certificate"
+        }
+      }
+    }
+  },
+
+  "required": [
+    "replicaCount",
+    "image",
+    "service",
+    "webhook",
+    "excludeNamespaces",
+    "certManager"
+  ]
+}
