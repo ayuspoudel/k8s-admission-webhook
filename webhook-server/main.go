@@ -25,7 +25,7 @@ And the response we need to send back is of the form
 		kind: "AdmissionReview",
 		response: {
 			uid: 123,
-			allowed: true,
+			allowed: true
 		}
 	}
 
