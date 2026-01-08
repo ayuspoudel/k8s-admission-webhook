@@ -35,7 +35,7 @@ jobs:
 
     env:
       APP_NAME: webhook-server
-      VALUES_FILE: charts/webhook-server/values.yaml
+      VALUES_FILE: charts/values.yaml
 
     steps:
       - name: Checkout (release)
@@ -97,7 +97,7 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      VALUES_FILE: charts/webhook-server/values.yaml
+      VALUES_FILE: charts/values.yaml
 
     steps:
       - name: Checkout (gitops)
