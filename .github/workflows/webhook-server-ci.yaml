@@ -1,0 +1,134 @@
+name: Webhook server CI
+
+on:
+  push:
+    branches: [ develop ]
+    paths:
+      - "webhook-server/**"
+  workflow_dispatch:
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.detect.outputs.changed }}
+
+    steps:
+      - name: Checkout (detect)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect sentinel webhook-server changes
+        id: detect
+        run: |
+          if git diff --name-only HEAD~1 | grep -q '^webhook-server/'; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+
+  release:
+    needs: detect
+    if: needs.detect.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+
+    env:
+      APP_NAME: webhook-server
+      VALUES_FILE: charts/webhook-server/values.yaml
+
+    steps:
+      - name: Checkout (release)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read current version
+        id: version
+        run: |
+          CURRENT=$(yq e '.image.tag' $VALUES_FILE)
+
+          if [ -z "$CURRENT" ] || [ "$CURRENT" = "null" ]; then
+            echo "ERROR: Missing image.tag in $VALUES_FILE"
+            exit 1
+          fi
+
+          echo "Current version: $CURRENT"
+          echo "current=$CURRENT" >> $GITHUB_OUTPUT
+
+      - name: Bump patch version
+        id: bump
+        run: |
+          IFS='.' read -r M m p <<< "${{ steps.version.outputs.current }}"
+          NEW="$M.$m.$((p+1))"
+
+          echo "New version: $NEW"
+          echo "new=$NEW" >> $GITHUB_OUTPUT
+
+      - name: Docker login
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build & push image
+        run: |
+          IMAGE="${{ secrets.DOCKERHUB_USERNAME }}/webhook-server:${{ steps.bump.outputs.new }}"
+
+          echo "Building $IMAGE"
+          docker build -t "$IMAGE" ./webhook-server
+
+          echo "Pushing $IMAGE"
+          docker push "$IMAGE"
+
+      - name: Write change artifact
+        run: |
+          mkdir -p changes
+          jq -n --arg version "${{ steps.bump.outputs.new }}" '{version: $version}' > changes/webhook-server.json
+
+      - name: Upload change artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: webhook-server-change
+          path: changes/
+
+  gitops:
+    needs: release
+    runs-on: ubuntu-latest
+
+    env:
+      VALUES_FILE: charts/webhook-server/values.yaml
+
+    steps:
+      - name: Checkout (gitops)
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITOPS_TOKEN }}
+          fetch-depth: 0
+
+      - name: Download change artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: webhook-server-change
+          path: changes
+
+      - name: Apply GitOps changes
+        run: |
+          VERSION=$(jq -r '.version' changes/webhook-server.json)
+          echo "Updating webhook-server -> $VERSION"
+          yq -i ".image.tag = \"${VERSION}\"" $VALUES_FILE
+
+      - name: Commit & push
+        run: |
+            if git diff --quiet; then
+            echo "No GitOps changes detected"
+            exit 0
+            fi
+
+            git config user.name "sentinel-ci"
+            git config user.email "sentinel-ci@users.noreply.github.com"
+
+            git add "$VALUES_FILE"
+            git commit -m "gitops: update webhook-server image"
+            git push
+
