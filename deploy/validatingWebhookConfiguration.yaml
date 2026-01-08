@@ -1,0 +1,30 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: test-webhook
+  annotations:
+    cert-manager.io/inject-ca-from: webhook-test/webhook-server-cert
+webhooks:
+- name: webhook-server.webhook-test.svc
+  admissionReviewVersions: ["v1"]
+  sideEffects: None
+  failurePolicy: Fail
+  timeoutSeconds: 5
+  namespaceSelector:
+    matchExpressions:
+      - key: kubernetes.io/metadata.name
+        operator: NotIn
+        values:
+          - webhook-test
+
+  clientConfig:
+    service:
+      name: webhook-server
+      namespace: webhook-test
+      path: /validate
+      port: 443
+  rules:
+  - operations: ["CREATE"]
+    apiGroups: [""]
+    apiVersions: ["v1"]
+    resources: ["pods"]

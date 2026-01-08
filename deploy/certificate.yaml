@@ -1,0 +1,15 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: webhook-server-cert
+  namespace: webhook-test
+spec:
+  secretName: webhook-tls
+  issuerRef:
+    name: webhook-selfsigned
+    kind: Issuer
+  dnsNames:
+    - webhook-server
+    - webhook-server.webhook-test
+    - webhook-server.webhook-test.svc
+    - webhook-server.webhook-test.svc.cluster.local

@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webhook-server
+  namespace: webhook-test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: webhook-server
+  template:
+    metadata:
+      labels:
+        app: webhook-server
+    spec:
+      # REQUIRED: allow nonroot user to read Secret-mounted certs
+      securityContext:
+        fsGroup: 65532
+
+      containers:
+      - name: webhook
+        image: ayuspoudel/webhook-server:1.0.1
+        imagePullPolicy: Always
+
+        ports:
+        - containerPort: 8443
+
+        volumeMounts:
+        - name: tls
+          mountPath: /certs
+          readOnly: true
+
+        # IMPORTANT: ensure webhook is ready before API server calls it
+        readinessProbe:
+          httpGet:
+            scheme: HTTPS
+            path: /healthz
+            port: 8443
+          initialDelaySeconds: 5
+          periodSeconds: 5
+
+        # Optional but recommended for admission webhooks
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+
+      volumes:
+      - name: tls
+        secret:
+          secretName: webhook-tls
